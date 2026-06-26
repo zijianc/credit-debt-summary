@@ -56,6 +56,12 @@ function isImage(file: File) {
   return file.type.startsWith('image/');
 }
 
+function makeClientId(prefix: string) {
+  const randomUuid = globalThis.crypto && 'randomUUID' in globalThis.crypto ? globalThis.crypto.randomUUID() : null;
+  const fallback = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `${prefix}:${randomUuid || fallback}`;
+}
+
 async function readPdfText(file: File) {
   const data = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data }).promise;
@@ -248,7 +254,7 @@ function App() {
 
         const newImages = await Promise.all(
           imageFiles.map(async (file) => ({
-            id: `${file.name}:${file.lastModified}:${crypto.randomUUID()}`,
+            id: makeClientId(`${file.name}:${file.lastModified}`),
             name: file.name,
             image: await loadImage(file),
             rotation: 0 as const,
