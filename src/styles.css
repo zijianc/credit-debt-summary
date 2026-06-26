@@ -105,7 +105,25 @@ h1 {
   margin-bottom: 18px;
 }
 
-.upload-zone input {
+.drop-zone {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  margin: -8px 0 18px;
+  border: 1px solid #d8ddd4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6d786e;
+  cursor: pointer;
+}
+
+.upload-zone,
+.drop-zone {
+  position: relative;
+}
+
+.upload-zone input,
+.drop-zone input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -120,6 +138,34 @@ h1 {
   color: #6d786e;
   margin-top: 4px;
   overflow-wrap: anywhere;
+}
+
+.drop-zone small {
+  color: #6d786e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.upload-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.upload-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 46px;
+  border: 1px solid #cfd8cd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #255d3b;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .textarea-row {
@@ -314,6 +360,8 @@ textarea:focus,
 .primary-button:focus-visible,
 .icon-button:focus-visible,
 .ghost-button:focus-visible,
+.upload-actions button:focus-visible,
+.drop-zone:focus-within,
 .upload-zone:focus-within {
   outline: 3px solid #a7cdb4;
   outline-offset: 2px;
@@ -489,8 +537,20 @@ tr:last-child td {
     padding: 24px 16px;
   }
 
+  .drop-zone {
+    display: none;
+  }
+
   .upload-zone span {
     font-size: 20px;
+  }
+
+  .upload-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-actions button {
+    min-height: 52px;
   }
 
   .primary-button,

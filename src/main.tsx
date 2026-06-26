@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { AlertTriangle, BrainCircuit, FileText, Lock, RotateCcw, RotateCw, UploadCloud, X } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, Camera, FileText, Images, Lock, RotateCcw, RotateCw, UploadCloud, X } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { DebtItem, DebtSummary, parseDebtReport } from './lib/debtParser';
@@ -180,6 +180,9 @@ async function analyzeWithAi(payload: { mode?: 'accurate' | 'fast'; text?: strin
 }
 
 function App() {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
   const [rawText, setRawText] = useState('');
   const [isReading, setIsReading] = useState(false);
@@ -356,6 +359,12 @@ function App() {
     setError('');
   }
 
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files || []);
+    if (files.length > 0) void handleFiles(files);
+    event.currentTarget.value = '';
+  }
+
   return (
     <main className="app-shell">
       <section className="workspace">
@@ -371,20 +380,42 @@ function App() {
             </span>
           </div>
 
-          <label className="upload-zone">
+          <div className="upload-zone">
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleInputChange}
+            />
+            <input ref={imageInputRef} type="file" accept="image/*" multiple onChange={handleInputChange} />
+            <input ref={fileInputRef} type="file" accept="application/pdf,.pdf" onChange={handleInputChange} />
+            <UploadCloud size={28} />
+            <span>{isReading ? '正在读取...' : '上传征信报告'}</span>
+            <small>{fileName || `拍照、选相册或选 PDF；照片最多 ${maxUploadImages} 张`}</small>
+            <div className="upload-actions">
+              <button type="button" onClick={() => cameraInputRef.current?.click()}>
+                <Camera size={18} />
+                拍照
+              </button>
+              <button type="button" onClick={() => imageInputRef.current?.click()}>
+                <Images size={18} />
+                相册照片
+              </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()}>
+                <FileText size={18} />
+                PDF 文件
+              </button>
+            </div>
+          </div>
+          <label className="drop-zone">
             <input
               type="file"
               accept="application/pdf,.pdf,image/*"
               multiple
-              onChange={(event) => {
-                const files = Array.from(event.currentTarget.files || []);
-                if (files.length > 0) void handleFiles(files);
-                event.currentTarget.value = '';
-              }}
+              onChange={handleInputChange}
             />
-            <UploadCloud size={28} />
-            <span>{isReading ? '正在读取...' : '拍照或选择征信照片'}</span>
-            <small>{fileName || `可多选，最多 ${maxUploadImages} 张；PDF 也支持`}</small>
+            <small>电脑可拖拽或点击选择文件</small>
           </label>
 
           {uploadedImages.length > 0 && (
