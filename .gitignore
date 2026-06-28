@@ -5,6 +5,10 @@ dist/
 .env.*
 !.env.example
 npm-debug.log*
+private*.key
+miniprogram/private*.json
+miniprogram/upload*.key
+miniprogram/*.key
 
 
 #Ignore vscode AI rules

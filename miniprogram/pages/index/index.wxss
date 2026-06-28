@@ -1,0 +1,289 @@
+.page {
+  min-height: 100vh;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.header {
+  margin: 12rpx 0 24rpx;
+}
+
+.eyebrow {
+  color: #647264;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.title {
+  margin-top: 8rpx;
+  color: #17201b;
+  font-size: 54rpx;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.subtitle {
+  margin-top: 14rpx;
+  color: #647264;
+  font-size: 27rpx;
+  line-height: 1.5;
+}
+
+.panel {
+  margin-bottom: 22rpx;
+  padding: 24rpx;
+  border: 1rpx solid #d9ded5;
+  border-radius: 16rpx;
+  background: #ffffff;
+  box-shadow: 0 14rpx 42rpx rgba(38, 51, 38, 0.08);
+}
+
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18rpx;
+}
+
+.upload-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  min-height: 96rpx;
+  border: 1rpx solid #cfd8cd;
+  border-radius: 14rpx;
+  background: #f9faf7;
+  color: #255d3b;
+  font-size: 31rpx;
+  font-weight: 800;
+}
+
+.upload-icon {
+  font-size: 36rpx;
+}
+
+.file-summary {
+  margin-top: 22rpx;
+  padding: 18rpx;
+  border-radius: 14rpx;
+  background: #f8f9f6;
+  border: 1rpx solid #e1e5de;
+}
+
+.file-title {
+  color: #33433a;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.file-list {
+  margin-top: 12rpx;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 12rpx 0;
+  color: #536057;
+  font-size: 25rpx;
+  border-top: 1rpx solid #e6e9e2;
+}
+
+.file-item text {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.mini-button {
+  flex: 0 0 auto;
+  min-width: 104rpx;
+  height: 56rpx;
+  padding: 0 16rpx;
+  border: 1rpx solid #d8ddd4;
+  border-radius: 10rpx;
+  background: #ffffff;
+  color: #536057;
+  font-size: 24rpx;
+  line-height: 56rpx;
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-top: 24rpx;
+  border: 1rpx solid #d8ddd4;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.mode-button {
+  min-height: 78rpx;
+  border-radius: 0;
+  background: #f7f8f5;
+  color: #536057;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.mode-button.active {
+  background: #1f5a3b;
+  color: #ffffff;
+}
+
+.primary-button {
+  margin-top: 22rpx;
+  min-height: 88rpx;
+  border-radius: 12rpx;
+  background: #1f5a3b;
+  color: #ffffff;
+  font-size: 31rpx;
+  font-weight: 900;
+}
+
+.clear-button {
+  margin-top: 16rpx;
+  min-height: 76rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  color: #536057;
+  border: 1rpx solid #d8ddd4;
+  font-size: 28rpx;
+}
+
+.result-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.metric {
+  padding: 28rpx;
+  background: #1f5a3b;
+  color: #ffffff;
+}
+
+.metric-label {
+  font-size: 26rpx;
+  font-weight: 800;
+  opacity: 0.82;
+}
+
+.metric-value {
+  margin-top: 12rpx;
+  font-size: 56rpx;
+  font-weight: 900;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.result-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  padding: 22rpx 28rpx;
+  color: #536057;
+  font-size: 26rpx;
+  font-weight: 800;
+  border-bottom: 1rpx solid #e6e9e2;
+}
+
+.items {
+  padding: 18rpx;
+}
+
+.debt-card {
+  padding: 20rpx;
+  border: 1rpx solid #e1e5de;
+  border-radius: 14rpx;
+  background: #fbfcf9;
+  margin-bottom: 16rpx;
+}
+
+.debt-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.kind {
+  color: #17201b;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.amount {
+  color: #17201b;
+  font-size: 31rpx;
+  font-weight: 900;
+}
+
+.source {
+  margin-top: 12rpx;
+  color: #536057;
+  font-size: 25rpx;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.confidence {
+  display: inline-block;
+  margin-top: 14rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.confidence.high {
+  color: #1d6a41;
+  background: #e4f3e9;
+}
+
+.confidence.medium {
+  color: #78500a;
+  background: #fff1c6;
+}
+
+.confidence.low {
+  color: #86322a;
+  background: #ffe2de;
+}
+
+.empty {
+  padding: 70rpx 36rpx;
+  color: #6a756b;
+  text-align: center;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+.notice {
+  margin-bottom: 22rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.notice.error {
+  color: #8d251f;
+  background: #fff1ef;
+  border: 1rpx solid #f0c9c5;
+}
+
+.notice.warning {
+  color: #78500a;
+  background: #fff8e8;
+  border: 1rpx solid #ead9a9;
+}
+
+.footnote {
+  color: #6d786e;
+  font-size: 24rpx;
+  line-height: 1.5;
+  padding: 8rpx 2rpx 28rpx;
+}

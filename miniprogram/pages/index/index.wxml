@@ -1,0 +1,83 @@
+<view class="page">
+  <view class="header">
+    <view class="eyebrow">本地选择 · 后端 AI 统计</view>
+    <view class="title">征信欠款统计</view>
+    <view class="subtitle">拍照、相册或微信文件选择征信报告，只展示当前欠款。</view>
+  </view>
+
+  <view class="panel">
+    <view class="upload-grid">
+      <button class="upload-button" bindtap="takePhoto" disabled="{{isAnalyzing || isReading}}">
+        <text class="upload-icon">📷</text>
+        <text>拍照</text>
+      </button>
+      <button class="upload-button" bindtap="chooseAlbum" disabled="{{isAnalyzing || isReading}}">
+        <text class="upload-icon">🖼</text>
+        <text>相册照片</text>
+      </button>
+      <button class="upload-button" bindtap="chooseWechatPdf" disabled="{{isAnalyzing || isReading}}">
+        <text class="upload-icon">📄</text>
+        <text>微信 PDF</text>
+      </button>
+    </view>
+
+    <view class="file-summary" wx:if="{{files.length > 0}}">
+      <view class="file-title">{{files.length}} 个文件</view>
+      <view class="file-list">
+        <view class="file-item" wx:for="{{files}}" wx:key="id">
+          <text>{{index + 1}}. {{item.name}}</text>
+          <button class="mini-button" data-id="{{item.id}}" bindtap="removeFile">移除</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="mode-row">
+      <button class="mode-button {{mode === 'accurate' ? 'active' : ''}}" data-mode="accurate" bindtap="setMode">精准</button>
+      <button class="mode-button {{mode === 'fast' ? 'active' : ''}}" data-mode="fast" bindtap="setMode">快速</button>
+    </view>
+
+    <button class="primary-button" bindtap="analyze" disabled="{{!canAnalyze || isAnalyzing || isReading}}">
+      {{isReading ? '正在读取文件...' : isAnalyzing ? '正在统计...' : '开始统计欠款'}}
+    </button>
+    <button class="clear-button" wx:if="{{files.length > 0 || result}}" bindtap="clearAll" disabled="{{isAnalyzing || isReading}}">
+      清空
+    </button>
+  </view>
+
+  <view class="notice error" wx:if="{{error}}">
+    {{error}}
+  </view>
+
+  <view class="panel result-panel">
+    <view class="metric">
+      <view class="metric-label">欠款合计</view>
+      <view class="metric-value">¥{{totalText}}</view>
+    </view>
+    <view class="result-meta">
+      <view>识别条目：{{itemCount}}</view>
+      <view>需复核：{{reviewCount}}</view>
+    </view>
+
+    <view wx:if="{{items.length > 0}}" class="items">
+      <view class="debt-card" wx:for="{{items}}" wx:key="id">
+        <view class="debt-row">
+          <text class="kind">{{item.kind}}</text>
+          <text class="amount">¥{{item.amountText}}</text>
+        </view>
+        <view class="source">{{item.source}}</view>
+        <view class="confidence {{item.confidence}}">可信度：{{item.confidenceText}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty">
+      上传征信报告后，这里会显示欠款统计结果。
+    </view>
+  </view>
+
+  <view class="notice warning" wx:if="{{warnings.length > 0}}">
+    <view wx:for="{{warnings}}" wx:key="*this">{{item}}</view>
+  </view>
+
+  <view class="footnote">
+    文件会发送到你自己的后端，再调用百炼模型。密钥不会进入小程序代码。
+  </view>
+</view>

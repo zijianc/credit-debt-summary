@@ -38,6 +38,7 @@ const debtFieldPattern = /余额|余额为|未还本金|剩余本金|已使用�
 const nonDebtFieldPattern = /信用额度|授信额度|合同金额|发放金额|借款金额|贷款金额|贷款额度|担保额度|月还款|还款额|单家机构最高授信额|最高授信额|最近6个月平均|最近六个月平均|已结清|销户|外币|美元账户/;
 const moneyPattern = /([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/;
 const maxImageFiles = 6;
+const maxPdfFiles = 2;
 
 const debtAnalysisRules = [
   '你是一名专业的中国个人征信报告解析助手。',
@@ -219,6 +220,47 @@ function normalizeSummary(value: unknown): DebtSummary {
   };
 }
 
+function dataUrlToBytes(dataUrl: string) {
+  const base64 = dataUrl.split(',')[1] || '';
+  if (!base64) return new Uint8Array();
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function extractTextFromPdf(file: UploadedReportFile) {
+  const bytes = dataUrlToBytes(file.dataUrl);
+  if (bytes.length === 0) return '';
+
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdf = await pdfjs.getDocument({
+    data: bytes,
+    disableFontFace: true,
+    useSystemFonts: true,
+  }).promise;
+  const pages: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
+      .join(' ')
+      .trim();
+    if (pageText) pages.push(`--- PDF ${file.name} 第 ${pageNumber} 页 ---\n${pageText}`);
+  }
+
+  return pages.join('\n\n');
+}
+
+async function extractTextFromPdfs(files: UploadedReportFile[]) {
+  const texts = await Promise.all(files.slice(0, maxPdfFiles).map((file) => extractTextFromPdf(file)));
+  return texts.filter(Boolean).join('\n\n');
+}
+
 export function createAnalyzeReportHandler(getEnv: EnvGetter) {
   const getBaseUrl = () => (getEnv('DASHSCOPE_BASE_URL') || 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, '');
   const getApiKey = () => getEnv('DASHSCOPE_API_KEY') || getEnv('BAILIAN_API_KEY') || '';
@@ -379,29 +421,46 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
       const files = body.files || [];
       const mode = body.mode || 'accurate';
       const providedText = body.text?.trim() || '';
+      const imageFiles = files.filter((file) => file.dataUrl.startsWith('data:image/'));
+      const pdfFiles = files.filter((file) => file.dataUrl.startsWith('data:application/pdf'));
+      const unsupportedFiles = files.filter(
+        (file) => !file.dataUrl.startsWith('data:image/') && !file.dataUrl.startsWith('data:application/pdf'),
+      );
 
       if (!providedText && files.length === 0) {
         return json({ error: 'Missing report text or images.' }, { status: 400 });
       }
 
-      if (files.some((file) => !file.dataUrl.startsWith('data:image/'))) {
-        return json({ error: 'Only image data URLs can be sent to the OCR model.' }, { status: 400 });
+      if (unsupportedFiles.length > 0) {
+        return json({ error: 'Only image or PDF files are supported.' }, { status: 400 });
+      }
+
+      const pdfText = pdfFiles.length > 0 ? await extractTextFromPdfs(pdfFiles) : '';
+      const combinedText = [providedText, pdfText].filter(Boolean).join('\n\n--- PDF TEXT ---\n\n');
+
+      if (!combinedText.trim() && imageFiles.length === 0) {
+        return json(
+          {
+            error: '这个 PDF 没有可提取的文字层。请改用拍照或图片上传，或上传清晰扫描图片。',
+          },
+          { status: 400 },
+        );
       }
 
       const summary =
-      files.length > 0 && mode === 'fast'
-          ? await summarizeImageDebts(files, providedText)
-          : files.length > 0
-            ? await summarizeDebts([providedText, await extractTextWithVision(files)].filter(Boolean).join('\n\n--- OCR ---\n\n'))
-            : await summarizeDebts(providedText);
+        imageFiles.length > 0 && mode === 'fast'
+          ? await summarizeImageDebts(imageFiles, combinedText)
+          : imageFiles.length > 0
+            ? await summarizeDebts([combinedText, await extractTextWithVision(imageFiles)].filter(Boolean).join('\n\n--- OCR ---\n\n'))
+            : await summarizeDebts(combinedText);
 
       return json({
         summary,
         modelTrace: {
-          visionModel: files.length > 0 ? (mode === 'fast' ? getFastVisionModel() : getVisionModel()) : null,
-          reasoningModel: files.length > 0 && mode === 'fast' ? getFastVisionModel() : getReasoningModel(),
+          visionModel: imageFiles.length > 0 ? (mode === 'fast' ? getFastVisionModel() : getVisionModel()) : null,
+          reasoningModel: imageFiles.length > 0 && mode === 'fast' ? getFastVisionModel() : getReasoningModel(),
           mode,
-          usedOcr: files.length > 0,
+          usedOcr: imageFiles.length > 0,
         },
       });
     } catch (error) {
