@@ -1,9 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { AlertTriangle, BrainCircuit, Camera, FileText, Images, Lock, RotateCcw, RotateCw, UploadCloud, X } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-import { DebtItem, DebtSummary, parseDebtReport } from './lib/debtParser';
+import { DebtItem, DebtSummary } from './lib/debtParser';
 import './styles.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -37,6 +37,11 @@ const currencyFormatter = new Intl.NumberFormat('zh-CN', {
 const accurateImageMaxSide = 2200;
 const fastImageMaxSide = 1800;
 const maxUploadImages = 6;
+const emptySummary: DebtSummary = {
+  total: 0,
+  items: [],
+  warnings: [],
+};
 
 function formatMoney(value: number) {
   return currencyFormatter.format(value);
@@ -191,13 +196,12 @@ function App() {
   const [aiSummary, setAiSummary] = useState<DebtSummary | null>(null);
   const [aiTrace, setAiTrace] = useState<AiTrace | null>(null);
   const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([]);
-  const [analysisMode, setAnalysisMode] = useState<'accurate' | 'fast'>('accurate');
+  const [analysisMode, setAnalysisMode] = useState<'accurate' | 'fast'>('fast');
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
 
-  const localSummary: DebtSummary = useMemo(() => parseDebtReport(rawText), [rawText]);
-  const summary = aiSummary || localSummary;
-  const sourceLabel = aiSummary ? 'AI模型复核' : '本地规则';
+  const summary = aiSummary || emptySummary;
+  const sourceLabel = aiSummary ? 'AI模型统计' : isAiAnalyzing ? 'AI统计中' : '等待AI统计';
 
   function setMode(mode: 'accurate' | 'fast') {
     setAnalysisMode(mode);
@@ -287,7 +291,9 @@ function App() {
         setUploadedImages([]);
         setUploadedAssets([]);
 
-        if (!text.trim()) {
+        if (text.trim()) {
+          await runAiAnalysis({ text }, { preferPayloadFiles: true });
+        } else {
           const pdfImages = await renderPdfPagesAsImages(file);
           setUploadedAssets(pdfImages);
           await runAiAnalysis({ files: pdfImages }, { preferPayloadFiles: true });
@@ -371,7 +377,7 @@ function App() {
         <div className="panel input-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">本地 + AI 复核</p>
+              <p className="eyebrow">AI 模型统计</p>
               <h1>征信欠款统计</h1>
             </div>
             <span className="privacy-badge">

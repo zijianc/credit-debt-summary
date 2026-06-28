@@ -52,7 +52,7 @@ function compressImage(filePath) {
 Page({
   data: {
     files: [],
-    mode: 'accurate',
+    mode: 'fast',
     isReading: false,
     isAnalyzing: false,
     canAnalyze: false,
