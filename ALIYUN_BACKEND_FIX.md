@@ -203,9 +203,9 @@ pm2 logs credit-debt-summary --lines 120
 ```bash
 DASHSCOPE_API_KEY=真实Key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_VISION_MODEL=qwen3.6-plus
-QWEN_FAST_VISION_MODEL=qwen3.6-plus
-QWEN_REASONING_MODEL=qwen3.6-plus
+QWEN_VISION_MODEL=qwen3.7-plus
+QWEN_FAST_VISION_MODEL=qwen3.7-plus
+QWEN_REASONING_MODEL=qwen3.7-plus
 ```
 
 修改 `.env` 后重启：

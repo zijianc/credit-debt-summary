@@ -46,7 +46,7 @@ npm run build
 
 - 支持文本型 PDF 和手动粘贴文本。
 - 支持图片上传，图片会通过后端调用 Qwen 视觉模型识别。
-- 支持对 PDF、图片或粘贴文本进行 AI 复核；快速模式默认用 `qwen3.6-plus` 直接读图并输出结构化欠款，精准模式默认用 `qwen3.6-plus` 做视觉识别和欠款总结。
+- 支持对 PDF、图片或粘贴文本进行 AI 复核；快速模式默认用 `qwen3.7-plus` 直接读图并输出结构化欠款，精准模式默认用 `qwen3.7-plus` 做视觉识别和欠款总结。
 - 会识别贷款余额、未还本金、信用卡已用额度、透支余额、逾期金额等欠款语义。
 - 会排除授信额度、合同金额、发放金额、月还款额等非欠款字段。
 - 扫描件 PDF 会在浏览器中渲染前几页为图片，再交给后端 OCR。
@@ -57,9 +57,9 @@ npm run build
 
 - `DASHSCOPE_API_KEY`：百炼 API Key。
 - `DASHSCOPE_BASE_URL`：默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`。
-- `QWEN_VISION_MODEL`：默认 `qwen3.6-plus`。如果需要对比，也可以改成 `qwen3-vl-plus` 或 `qwen-vl-ocr`。
-- `QWEN_FAST_VISION_MODEL`：快速模式默认 `qwen3.6-plus`。
-- `QWEN_REASONING_MODEL`：默认 `qwen3.6-plus`，需要对比时可改成其他兼容模型。
+- `QWEN_VISION_MODEL`：默认 `qwen3.7-plus`。如果需要对比，也可以改成 `qwen3-vl-plus` 或 `qwen-vl-ocr`。
+- `QWEN_FAST_VISION_MODEL`：快速模式默认 `qwen3.7-plus`。
+- `QWEN_REASONING_MODEL`：默认 `qwen3.7-plus`，需要对比时可改成其他兼容模型。
 
 所有模型调用都会传入 `enable_thinking: false`，关闭深度思考以降低延迟。
 

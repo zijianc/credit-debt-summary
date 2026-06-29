@@ -264,9 +264,9 @@ async function extractTextFromPdfs(files: UploadedReportFile[]) {
 export function createAnalyzeReportHandler(getEnv: EnvGetter) {
   const getBaseUrl = () => (getEnv('DASHSCOPE_BASE_URL') || 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/$/, '');
   const getApiKey = () => getEnv('DASHSCOPE_API_KEY') || getEnv('BAILIAN_API_KEY') || '';
-  const getVisionModel = () => getEnv('QWEN_VISION_MODEL') || 'qwen3.6-plus';
-  const getFastVisionModel = () => getEnv('QWEN_FAST_VISION_MODEL') || 'qwen3.6-plus';
-  const getReasoningModel = () => getEnv('QWEN_REASONING_MODEL') || 'qwen3.6-plus';
+  const getVisionModel = () => getEnv('QWEN_VISION_MODEL') || 'qwen3.7-plus';
+  const getFastVisionModel = () => getEnv('QWEN_FAST_VISION_MODEL') || 'qwen3.7-plus';
+  const getReasoningModel = () => getEnv('QWEN_REASONING_MODEL') || 'qwen3.7-plus';
 
   async function callChatCompletion(
     model: string,
