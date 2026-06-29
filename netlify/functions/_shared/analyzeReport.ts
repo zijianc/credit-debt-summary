@@ -84,10 +84,21 @@ const debtAnalysisRules = [
   '返回格式：{"total":数字,"items":[{"kind":"贷款余额|信用卡欠款|逾期欠款|担保代偿|其他欠款","amount":数字,"source":"短依据","confidence":"high|medium|low"}],"warnings":["不计入项目或需要人工复核的点"]}',
   'items 必须逐账户或逐汇总表行列出，禁止把多个银行、多个账户或多个余额合并成一个 item。',
   '每个 item.source 只能包含一个计入金额。如果同类账户有多个金额，必须拆成多个 item。',
+  '如果账户很多、逐条输出会很长，可以按“信用卡当前欠款合计”“贷款当前余额合计”等类别输出合计 item；合计 item.source 只能包含一个合计金额，不能包含多个明细金额。',
   'total 必须等于 items 中 amount 的加总。',
   '每个 item.source 必须包含表名或账户位置、字段名和值，例如“非循环贷账户信息汇总 余额99,820”。',
   '如果字段模糊、金额识别不确定、账户可能重复，请写入 warnings，不要编造数字。',
 ].join('\n');
+
+class ModelJsonParseError extends Error {
+  constructor(
+    message: string,
+    readonly rawText: string,
+  ) {
+    super(message);
+    this.name = 'ModelJsonParseError';
+  }
+}
 
 function json(data: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(data), {
@@ -105,9 +116,14 @@ function extractJsonObject(text: string) {
   const start = candidate.indexOf('{');
   const end = candidate.lastIndexOf('}');
   if (start < 0 || end <= start) {
-    throw new Error('Reasoning model did not return JSON.');
+    throw new ModelJsonParseError('Reasoning model did not return JSON.', text);
   }
-  return JSON.parse(candidate.slice(start, end + 1));
+  const jsonText = candidate.slice(start, end + 1);
+  try {
+    return JSON.parse(jsonText);
+  } catch (error) {
+    throw new ModelJsonParseError(error instanceof Error ? error.message : 'Reasoning model returned invalid JSON.', jsonText);
+  }
 }
 
 function parseMoney(value: string) {
@@ -319,6 +335,40 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
     return content;
   }
 
+  async function extractSummaryFromModelJson(response: string, repairModel: string) {
+    try {
+      return normalizeSummary(extractJsonObject(response));
+    } catch (error) {
+      if (!(error instanceof ModelJsonParseError)) throw error;
+
+      const repaired = await callChatCompletion(
+        repairModel,
+        [
+          {
+            role: 'system',
+            content:
+              '你是严格的 JSON 修复器。只修复用户提供的坏 JSON，使其成为合法 JSON 对象。不要新增事实，不要重新计算，不要解释。输出必须是 {"total":数字,"items":[...],"warnings":[...]}。',
+          },
+          {
+            role: 'user',
+            content: [
+              '下面是模型返回的坏 JSON。请只修复语法错误：缺逗号、截断的字符串、尾随逗号、缺右括号等。',
+              '如果内容明显被截断，只保留已经完整出现的 item，并让 total 等于保留 items 的 amount 加总，在 warnings 里说明“模型 JSON 被截断，已按可恢复部分统计”。',
+              error.rawText.slice(0, 12000),
+            ].join('\n\n'),
+          },
+        ],
+        { maxTokens: 4096, temperature: 0, responseFormat: 'json_object' },
+      );
+
+      try {
+        return normalizeSummary(extractJsonObject(repaired));
+      } catch {
+        throw new Error('模型返回格式异常，已自动重试修复但仍失败。请重新点击分析，或切换精准模式后重试。');
+      }
+    }
+  }
+
   async function summarizeImageDebts(files: UploadedReportFile[], text?: string) {
     const content: AliyunMessage['content'] = [
       {
@@ -351,10 +401,10 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
           content,
         },
       ],
-      { maxTokens: 900, temperature: 0, responseFormat: 'json_object' },
+      { maxTokens: 4096, temperature: 0, responseFormat: 'json_object' },
     );
 
-    return normalizeSummary(extractJsonObject(response));
+    return extractSummaryFromModelJson(response, getFastVisionModel());
   }
 
   async function extractTextWithVision(files: UploadedReportFile[]) {
@@ -416,7 +466,7 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
       { temperature: 0, responseFormat: 'json_object' },
     );
 
-    return normalizeSummary(extractJsonObject(response));
+    return extractSummaryFromModelJson(response, getReasoningModel());
   }
 
   return async function analyzeReport(req: Request) {
@@ -475,6 +525,8 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
       const message =
         error instanceof Error && error.name === 'AbortError'
           ? '模型调用超时。快速模式请尝试旋转到正向、裁掉无关背景后重试；如果仍超时，建议把视觉模型切回 qwen3-vl-plus 或使用精准模式。'
+          : error instanceof ModelJsonParseError
+            ? '模型返回格式异常。请重新点击分析，或切换精准模式后重试。'
           : error instanceof Error
             ? error.message
             : 'AI analysis failed.';
