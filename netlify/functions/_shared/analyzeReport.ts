@@ -14,6 +14,20 @@ type AnalyzeRequest = {
   files?: UploadedReportFile[];
 };
 
+type ExtractedLedgerEntry = {
+  no?: string | number;
+  amount?: number | string;
+  include?: boolean;
+  source?: string;
+  reason?: string;
+};
+
+type ExtractedLedger = {
+  creditCards?: ExtractedLedgerEntry[];
+  loans?: ExtractedLedgerEntry[];
+  warnings?: string[];
+};
+
 type AliyunMessage = {
   role: 'system' | 'user' | 'assistant';
   content:
@@ -369,6 +383,149 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
     }
   }
 
+  async function extractObjectFromModelJson(response: string, repairModel: string) {
+    try {
+      return extractJsonObject(response);
+    } catch (error) {
+      if (!(error instanceof ModelJsonParseError)) throw error;
+
+      const repaired = await callChatCompletion(
+        repairModel,
+        [
+          {
+            role: 'system',
+            content: '你是严格的 JSON 修复器。只修复用户提供的坏 JSON，使其成为合法 JSON 对象。不要新增事实，不要重新计算，不要解释。',
+          },
+          {
+            role: 'user',
+            content: error.rawText.slice(0, 12000),
+          },
+        ],
+        { maxTokens: 4096, temperature: 0, responseFormat: 'json_object' },
+      );
+
+      try {
+        return extractJsonObject(repaired);
+      } catch {
+        throw new Error('模型返回格式异常，已自动重试修复但仍失败。请重新点击分析，或切换精准模式后重试。');
+      }
+    }
+  }
+
+  function normalizeExtractedAmount(value: unknown) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') return parseMoney(value);
+    return 0;
+  }
+
+  function buildSummaryFromLedger(value: unknown): DebtSummary {
+    const ledger = value as ExtractedLedger;
+    const warnings = Array.isArray(ledger.warnings) ? ledger.warnings.filter((warning): warning is string => typeof warning === 'string') : [];
+
+    function includedEntries(entries: ExtractedLedgerEntry[] | undefined, prefix: string) {
+      const seen = new Set<string>();
+      return (Array.isArray(entries) ? entries : [])
+        .map((entry, index) => {
+          const amount = normalizeExtractedAmount(entry.amount);
+          const source = typeof entry.source === 'string' ? entry.source.trim() : '';
+          const no = entry.no == null ? '' : String(entry.no).trim();
+          return {
+            amount,
+            source,
+            key: `${prefix}:${no || source || index}:${amount}`,
+            include: entry.include !== false,
+          };
+        })
+        .filter((entry) => entry.include && entry.amount > 0 && entry.amount < 1000000000)
+        .filter((entry) => {
+          if (seen.has(entry.key)) return false;
+          seen.add(entry.key);
+          return true;
+        });
+    }
+
+    const creditCards = includedEntries(ledger.creditCards, 'card');
+    const loans = includedEntries(ledger.loans, 'loan');
+    const creditTotal = Math.round(creditCards.reduce((sum, entry) => sum + entry.amount, 0) * 100) / 100;
+    const loanTotal = Math.round(loans.reduce((sum, entry) => sum + entry.amount, 0) * 100) / 100;
+    const items: DebtItem[] = [];
+
+    if (loanTotal > 0) {
+      items.push({
+        id: `贷款余额:${loanTotal}:structured-ledger`,
+        kind: '贷款余额',
+        amount: loanTotal,
+        source: `贷款明细结构化汇总 余额${loanTotal.toLocaleString('en-US')}，${loans.length}项`,
+        confidence: 'high',
+      });
+    }
+
+    if (creditTotal > 0) {
+      items.push({
+        id: `信用卡欠款:${creditTotal}:structured-ledger`,
+        kind: '信用卡欠款',
+        amount: creditTotal,
+        source: `信用卡明细结构化汇总 欠款${creditTotal.toLocaleString('en-US')}，${creditCards.length}项`,
+        confidence: 'high',
+      });
+    }
+
+    if (items.length === 0) {
+      warnings.push('模型未抽取到可计入的当前欠款明细。');
+    }
+
+    return {
+      total: Math.round((creditTotal + loanTotal) * 100) / 100,
+      items: items.sort((a, b) => b.amount - a.amount),
+      warnings,
+    };
+  }
+
+  async function summarizeImagesByStructuredLedger(files: UploadedReportFile[], text?: string) {
+    const content: AliyunMessage['content'] = [
+      {
+        type: 'text',
+        text: [
+          '你是一名专业的中国个人征信报告账目抽取助手。',
+          '请只做结构化抽取，不要心算解释，不要输出 Markdown。',
+          '输出 JSON：{"creditCards":[{"no":"编号","amount":数字,"source":"短依据"}],"loans":[{"no":"编号","amount":数字,"source":"短依据"}],"warnings":["..."]}',
+          'creditCards 和 loans 数组只输出需要计入当前欠款的条目。不要在数组里输出已结清、销户、未激活、余额0、授信额度、查询记录等不计入条目；这些只放到 warnings 概括说明。',
+          '信用卡规则：只计入人民币账户、未销户/未激活以外、当前已使用额度或余额大于0的账户。美元账户、销户、未激活、金额0不计入。',
+          '信用卡如果出现“余额X（含未出单的大额专项分期余额Y）”，只取 X，不要取 Y，也不要把 X 和 Y 相加。',
+          '贷款规则：只计入“贷款”明细中当前未结清且余额大于0的账户。已结清、余额0、授信额度、可循环授信但余额0、查询记录不计入。',
+          '贷款明细通常是编号列表，必须按编号从小到大连续扫描全部图片。不要只统计第一页或前半段；第二、第三张图中继续出现的编号也必须抽取。',
+          '图片之间可能重叠，同一编号重复出现时仍输出同一个编号，后端会按编号去重。',
+          '如果出现“已结清”段落，后续同类贷款编号通常为历史已结清账户，不计入。',
+          '如果信息概要显示“贷款-其他 未结清/未销户账户数”为 N，且图片提供了这些未结清账户明细编号，则 loans 应尽量覆盖全部余额大于0的未结清编号；漏掉一段连续编号是严重错误。',
+          '不要把首页“账户数、未结清/未销户账户数”当作金额。',
+          '金额必须精确到元，不要估算；看不清的条目不要放进数组，只写入 warnings。',
+          text ? `补充文本：${text.slice(0, 2000)}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      },
+      ...files.slice(0, maxImageFiles).map((file) => ({
+        type: 'image_url' as const,
+        image_url: {
+          url: file.dataUrl,
+        },
+      })),
+    ];
+
+    const response = await callChatCompletion(
+      getFastVisionModel(),
+      [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+      { maxTokens: 4096, temperature: 0, responseFormat: 'json_object' },
+    );
+
+    return buildSummaryFromLedger(await extractObjectFromModelJson(response, getFastVisionModel()));
+  }
+
   async function summarizeImageDebts(files: UploadedReportFile[], text?: string) {
     const content: AliyunMessage['content'] = [
       {
@@ -507,7 +664,9 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
 
       const summary =
         imageFiles.length > 0 && mode === 'fast'
-          ? await summarizeImageDebts(imageFiles, combinedText)
+          ? imageFiles.length > 1
+            ? await summarizeImagesByStructuredLedger(imageFiles, combinedText)
+            : await summarizeImageDebts(imageFiles, combinedText)
           : imageFiles.length > 0
             ? await summarizeDebts([combinedText, await extractTextWithVision(imageFiles)].filter(Boolean).join('\n\n--- OCR ---\n\n'))
             : await summarizeDebts(combinedText);
