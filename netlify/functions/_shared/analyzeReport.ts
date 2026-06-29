@@ -82,6 +82,8 @@ const debtAnalysisRules = [
   '六、输出规则',
   '只输出 JSON，不要使用 Markdown，不要输出 OCR 全文，不要解释过程。',
   '返回格式：{"total":数字,"items":[{"kind":"贷款余额|信用卡欠款|逾期欠款|担保代偿|其他欠款","amount":数字,"source":"短依据","confidence":"high|medium|low"}],"warnings":["不计入项目或需要人工复核的点"]}',
+  'items 必须逐账户或逐汇总表行列出，禁止把多个银行、多个账户或多个余额合并成一个 item。',
+  '每个 item.source 只能包含一个计入金额。如果同类账户有多个金额，必须拆成多个 item。',
   'total 必须等于 items 中 amount 的加总。',
   '每个 item.source 必须包含表名或账户位置、字段名和值，例如“非循环贷账户信息汇总 余额99,820”。',
   '如果字段模糊、金额识别不确定、账户可能重复，请写入 warnings，不要编造数字。',
@@ -113,12 +115,14 @@ function parseMoney(value: string) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function extractDebtAmountFromSource(source: string) {
-  const match = source.match(
-    new RegExp(`(?:余额为|余额|当前余额|未结清余额|未还本金|剩余本金|已使用额度|已用额度|透支余额|当前逾期总额|逾期金额|逾期本金|呆账余额|代偿金额|垫款金额)\\s*${moneyPattern.source}`),
+function extractDebtAmountsFromSource(source: string) {
+  const matches = source.matchAll(
+    new RegExp(
+      `(?:余额为|余额|当前余额|未结清余额|未还本金|剩余本金|已使用额度|已用额度|透支余额|当前逾期总额|逾期金额|逾期本金|呆账余额|代偿金额|垫款金额)\\s*${moneyPattern.source}`,
+      'g',
+    ),
   );
-  if (!match) return 0;
-  return parseMoney(match[1]);
+  return [...matches].map((match) => parseMoney(match[1])).filter((amount) => amount > 0);
 }
 
 function extractSummaryItems(raw: Partial<DebtSummary>) {
@@ -164,7 +168,7 @@ function extractSummaryItems(raw: Partial<DebtSummary>) {
   return items;
 }
 
-function normalizeSummary(value: unknown): DebtSummary {
+export function normalizeSummary(value: unknown): DebtSummary {
   const raw = value as Partial<DebtSummary>;
   const items = Array.isArray(raw.items) ? raw.items : [];
 
@@ -177,8 +181,12 @@ function normalizeSummary(value: unknown): DebtSummary {
         ? (candidate.confidence as DebtItem['confidence'])
         : 'medium';
       const modelAmount = Number(candidate.amount);
-      const sourceAmount = extractDebtAmountFromSource(source);
-      const amount = sourceAmount > 0 && Math.abs(sourceAmount - modelAmount) >= 1 ? sourceAmount : modelAmount;
+      const sourceAmounts = extractDebtAmountsFromSource(source);
+      const sourceAmount = sourceAmounts.length === 1 ? sourceAmounts[0] : 0;
+      const amount =
+        sourceAmount > 0 && (!Number.isFinite(modelAmount) || Math.abs(sourceAmount - modelAmount) >= 1)
+          ? sourceAmount
+          : modelAmount;
 
       if (!Number.isFinite(amount) || amount <= 0) return null;
       if (nonDebtFieldPattern.test(source) && !debtFieldPattern.test(source)) return null;
