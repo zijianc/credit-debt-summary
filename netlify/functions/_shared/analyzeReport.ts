@@ -490,6 +490,10 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
           '请只做结构化抽取，不要心算解释，不要输出 Markdown。',
           '输出 JSON：{"creditCards":[{"no":"编号","amount":数字,"source":"短依据"}],"loans":[{"no":"编号","amount":数字,"source":"短依据"}],"warnings":["..."]}',
           'creditCards 和 loans 数组只输出需要计入当前欠款的条目。不要在数组里输出已结清、销户、未激活、余额0、授信额度、查询记录等不计入条目；这些只放到 warnings 概括说明。',
+          '必须先读取“二 信息概要 / 信贷交易授信及负债信息概要”。如果概要表里有“贷记卡账户信息汇总 已用额度X”“准贷记卡账户信息汇总 透支余额X”“非循环贷账户信息汇总 余额X”“循环贷账户信息汇总 余额X”，且 X 大于0，必须输出为计入条目。',
+          '如果概要表已经给出明确已用额度/透支余额/余额，就优先用概要表；不要因为没有信用卡明细页或贷款明细页就返回0。',
+          '示例：贷记卡账户信息汇总中“已用额度 5,875”必须输出 creditCards: [{"amount":5875,"source":"贷记卡账户信息汇总 已用额度5,875"}]。',
+          '示例：循环贷账户信息汇总中“余额 0”不输出条目，只在 warnings 概括说明余额为0未计入。',
           '信用卡规则：只计入人民币账户、未销户/未激活以外、当前已使用额度或余额大于0的账户。美元账户、销户、未激活、金额0不计入。',
           '信用卡如果出现“余额X（含未出单的大额专项分期余额Y）”，只取 X，不要取 Y，也不要把 X 和 Y 相加。',
           '贷款规则：只计入“贷款”明细中当前未结清且余额大于0的账户。已结清、余额0、授信额度、可循环授信但余额0、查询记录不计入。',
@@ -523,7 +527,8 @@ export function createAnalyzeReportHandler(getEnv: EnvGetter) {
       { maxTokens: 4096, temperature: 0, responseFormat: 'json_object' },
     );
 
-    return buildSummaryFromLedger(await extractObjectFromModelJson(response, getFastVisionModel()));
+    const summary = buildSummaryFromLedger(await extractObjectFromModelJson(response, getFastVisionModel()));
+    return summary.total > 0 ? summary : summarizeImageDebts(files, text);
   }
 
   async function summarizeImageDebts(files: UploadedReportFile[], text?: string) {
